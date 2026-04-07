@@ -1,0 +1,15 @@
+# OPTIONAL — only needed if you want to run the legacy Java-backed
+# script `run_trackmate_fiji_headless.py` directly. The pure-Python
+# entry point `run_trackmate_python_headless.py` does NOT require any
+# of these.
+#
+# Use case: cross-checking the pure-Python output against the original
+# Fiji/TrackMate Java pipeline. Both scripts produce bit-identical TSVs
+# (33/33 columns) so this is only relevant for verification or for
+# falling back to the JVM backend.
+
+-r requirements.txt
+
+pyimagej>=1.4
+scyjava>=1.9
+# Also requires Java 8 or 11 on PATH (PyImageJ legacy mode requirement)

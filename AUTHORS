@@ -1,0 +1,73 @@
+trackmate-py — Authors and Acknowledgements
+============================================
+
+trackmate-py is a pure-Python port of TrackMate's spot detection
+subsystem. It is a derivative work of the upstream TrackMate Java
+project and is distributed under the same GNU General Public License,
+version 3 (or later).
+
+
+Original work
+-------------
+
+TrackMate Java codebase (the canonical reference implementation that
+this project translates):
+
+    Copyright (C) 2010 - 2026 TrackMate developers.
+
+    Lead author: Jean-Yves Tinevez (Institut Pasteur, Paris)
+    Project home: https://imagej.net/plugins/trackmate
+    Source: https://github.com/trackmate-sc/TrackMate
+
+The detector classes specifically translated by this project are:
+
+    fiji.plugin.trackmate.detection.DogDetector
+    fiji.plugin.trackmate.detection.LogDetector
+    fiji.plugin.trackmate.detection.HessianDetector
+    fiji.plugin.trackmate.detection.DetectionUtils
+
+…together with the supporting imglib2 helpers
+(LocalExtrema / SubpixelLocalization, HessianMatrix, PartialDerivative,
+FFTConvolution / FFTMethods) and the Mines JTK prime-factor FFT engine
+(edu.mines.jtk.dsp.{Pfacc, FftReal, FftComplex}) that TrackMate's
+LogDetector invokes through imglib2-algorithm-fft.
+
+Mines JTK is originally distributed under the Apache License 2.0
+(Copyright (C) 2003 - 2017 Colorado School of Mines), and has been
+relicensed to GPL v3 here as permitted by Apache 2.0 § 4(b) when
+incorporated into a GPL-licensed combined work.
+
+imglib2-algorithm-fft is originally distributed under a BSD 2-clause
+license, which is GPL-compatible.
+
+
+Translation and port author
+---------------------------
+
+    Digin Dominic
+    https://github.com/digin1
+
+    Translation date: 2026-04-07
+    Original publication: <to be added when first tagged release lands>
+
+Digin is the sole author of:
+
+  * the Python translations under trackmate_py/
+  * the wrapper scripts run_trackmate_python_headless.py,
+    run_trackmate_fiji_headless.py
+  * the numba metric accelerators in _metric_helpers_numba.py
+  * the per-spot FWHM ellipse fit, KDTree dedup, confidence
+    columns, and visualization helpers
+
+
+Citation
+--------
+
+If you use trackmate-py in published work, please cite the original
+TrackMate paper:
+
+    Tinevez, J.-Y., Perry, N., Schindelin, J., Hoopes, G. M., Reynolds,
+    G. D., Laplantine, E., Bednarek, S. Y., Shorte, S. L., & Eliceiri,
+    K. W. (2017). TrackMate: An open and extensible platform for
+    single-particle tracking. Methods, 115, 80-90.
+    https://doi.org/10.1016/j.ymeth.2016.09.016

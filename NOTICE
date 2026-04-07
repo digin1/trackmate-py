@@ -1,0 +1,60 @@
+trackmate-py
+============
+
+Copyright (C) 2026 Digin Dominic <https://github.com/digin1>
+
+This product is a derivative work of TrackMate
+(https://github.com/trackmate-sc/TrackMate, GPL v3) and is distributed
+under the GNU General Public License, version 3 (or later).
+
+
+Modifications relative to upstream TrackMate
+---------------------------------------------
+
+The following files in trackmate_py/ are Python translations of the
+named upstream Java classes. They were created by Digin Dominic on
+2026-04-07.
+
+  trackmate_py/__init__.py             (package re-exports)
+  trackmate_py/detection_utils.py      ← fiji.plugin.trackmate.detection.DetectionUtils
+                                          + MedianFilter2D
+                                          + imglib2 LocalExtrema / SubpixelLocalization
+  trackmate_py/dog_detector.py         ← fiji.plugin.trackmate.detection.DogDetector
+  trackmate_py/log_detector.py         ← fiji.plugin.trackmate.detection.LogDetector
+  trackmate_py/hessian_detector.py     ← fiji.plugin.trackmate.detection.HessianDetector
+                                          + imglib2 HessianMatrix / PartialDerivative
+  trackmate_py/minesjtk_fft.py         ← edu.mines.jtk.dsp.{Pfacc, FftReal, FftComplex}
+                                          + net.imglib2.algorithm.fft2.FFT*
+
+The translations were verified bit-for-bit against the upstream Java
+pipeline on a representative microscopy tile
+(SD0311_A_FPS1_VGATSV2A_R_270125_QWC_VGAT_CY5_XY00660.tif): 33/33 TSV
+columns matched exactly across the DoG, LoG, and Hessian detectors
+(19499 spots on Hessian, 10191 on DoG, 9808 on LoG).
+
+The wrapper scripts and numba accelerators are original work by Digin
+Dominic, also released under GPL v3 because they form a combined work
+with the GPL-licensed translations.
+
+  run_trackmate_python_headless.py     (pure-Python entry point — no JVM)
+  run_trackmate_fiji_headless.py       (legacy PyImageJ entry point — optional)
+  _metric_helpers_numba.py             (numba accelerators for per-spot metrics)
+
+
+Third-party licenses
+--------------------
+
+trackmate-py incorporates work from the following upstream projects:
+
+  TrackMate                — GPL v3
+                             https://github.com/trackmate-sc/TrackMate
+  imglib2-algorithm-gpl    — GPL v3
+                             https://github.com/imglib/imglib2-algorithm-gpl
+  imglib2-algorithm-fft    — BSD 2-clause (GPL-compatible)
+                             https://github.com/imglib/imglib2-algorithm
+  Mines JTK                — Apache License 2.0 (relicensed to GPL v3
+                             here as permitted by § 4(b) when included
+                             in a GPL-licensed combined work)
+                             https://github.com/MinesJTK/jtk
+
+The full text of the GNU General Public License version 3 is in LICENSE.
