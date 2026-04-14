@@ -513,7 +513,7 @@ def fft_convolve(
 
     if image.ndim == 2:
         # Bit-exact Mines JTK path.
-        from trackmate_source.python_port.minesjtk_fft import fft_convolve_2d
+        from .minesjtk_fft import fft_convolve_2d
 
         result = fft_convolve_2d(image, kernel, extend_mode=extend_mode)
         if np.issubdtype(image.dtype, np.floating):
