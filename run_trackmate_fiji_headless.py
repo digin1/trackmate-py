@@ -35,6 +35,7 @@ import sys
 import argparse
 import logging
 import traceback
+import zipfile
 from pathlib import Path
 from glob import glob
 import pandas as pd
@@ -2226,6 +2227,117 @@ def create_visualization(image_path, detections_df, output_path):
         return False
 
 
+def create_roi_zip(detections_df, output_zip_path):
+    """
+    Export detections as an ImageJ ROI archive (.zip) openable in Fiji's
+    ROI Manager. One ROI per row in ``detections_df``.
+
+    Near-isotropic detections (|radius_major - radius_minor| < 1e-6, or
+    no ellipse-fit columns) are exported as axis-aligned OVAL ROIs so
+    users can resize them with Fiji's Oval tool. Genuinely oriented
+    ellipses are exported as 32-point polygon approximations, since
+    ImageJ's OVAL roi type is axis-aligned only.
+
+    Any pre-existing archive at ``output_zip_path`` is removed
+    unconditionally at entry — a rerun that produces zero detections
+    must leave no stale ROI file behind.
+    """
+    # Always clear any prior archive first so stale ROIs never survive
+    # a rerun. This runs even on empty-df / missing-import / exception
+    # paths: the contract is "after this call, the path reflects the
+    # current detections, or does not exist at all".
+    try:
+        if os.path.exists(output_zip_path):
+            os.remove(output_zip_path)
+    except OSError as rm_err:
+        logger.error(
+            f"Could not remove stale ROI archive {output_zip_path}: {rm_err}"
+        )
+        return False
+
+    try:
+        from roifile import ImagejRoi, ROI_TYPE
+    except ImportError:
+        logger.warning("roifile not installed — cannot export ROI archive.")
+        return False
+
+    if detections_df is None or len(detections_df) == 0:
+        logger.info(f"No detections — no ROI archive written for {output_zip_path}")
+        return False
+
+    has_ellipse = (
+        'radius_major' in detections_df.columns
+        and 'radius_minor' in detections_df.columns
+        and 'theta' in detections_df.columns
+    )
+
+    try:
+        # Write to a sibling temp path first, then atomically rename on
+        # success — guarantees the final path is either a complete
+        # archive or absent, never a half-written zip.
+        tmp_path = f"{output_zip_path}.tmp"
+        with zipfile.ZipFile(tmp_path, 'w') as zf:
+            for i, (_, row) in enumerate(detections_df.iterrows()):
+                cx = float(row['x'])
+                cy = float(row['y'])
+
+                if has_ellipse:
+                    a = float(row['radius_major'])
+                    b = float(row['radius_minor'])
+                    theta = float(row['theta'])
+                    # Near-isotropic → proper OVAL so Fiji renders a native
+                    # circle. Oriented → polygon approximation (OVAL is
+                    # axis-aligned only in ImageJ).
+                    if abs(a - b) < 1e-6:
+                        r = a
+                        roi = ImagejRoi(
+                            roitype=ROI_TYPE.OVAL,
+                            left=int(round(cx - r)),
+                            top=int(round(cy - r)),
+                            right=int(round(cx + r)),
+                            bottom=int(round(cy + r)),
+                        )
+                    else:
+                        n_pts = 32
+                        cos_t = np.cos(theta)
+                        sin_t = np.sin(theta)
+                        phis = np.linspace(0.0, 2.0 * np.pi, n_pts, endpoint=False)
+                        xu = a * np.cos(phis)
+                        yu = b * np.sin(phis)
+                        xs = cx + xu * cos_t - yu * sin_t
+                        ys = cy + xu * sin_t + yu * cos_t
+                        pts = np.column_stack([xs, ys]).astype(np.float32)
+                        roi = ImagejRoi.frompoints(pts)
+                        roi.roitype = ROI_TYPE.POLYGON
+                else:
+                    r = float(row['radius'])
+                    roi = ImagejRoi(
+                        roitype=ROI_TYPE.OVAL,
+                        left=int(round(cx - r)),
+                        top=int(round(cy - r)),
+                        right=int(round(cx + r)),
+                        bottom=int(round(cy + r)),
+                    )
+
+                zf.writestr(f"spot_{i}.roi", roi.tobytes())
+
+        os.replace(tmp_path, output_zip_path)
+        logger.info(f"ROI archive saved: {output_zip_path} ({len(detections_df)} ROIs)")
+        return True
+
+    except Exception as e:
+        logger.error(f"ROI archive failed for {output_zip_path}: {e}")
+        logger.error(traceback.format_exc())
+        # Ensure no partial tmp survives. The final path was already
+        # removed at entry, so a failure here leaves the slot empty.
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+
+
 def worker_cleanup():
     """Cleanup function called when worker process exits"""
     if TrackMateDetector.ij is not None:
@@ -2402,6 +2514,9 @@ def main():
     # Visualization options
     parser.add_argument('--visualize', action='store_true',
                        help='Generate PNG visualization overlays of detected synapses')
+    parser.add_argument('--export-roi', action='store_true',
+                       help='Export detections as an ImageJ ROI archive (.zip) '
+                            'openable in Fiji ROI Manager. One OVAL/ellipse ROI per spot.')
 
     args = parser.parse_args()
 
@@ -2539,6 +2654,11 @@ def main():
                 if args.visualize:
                     viz_file = detection_output / (Path(result['path']).stem + '_overlay.png')
                     create_visualization(result['path'], result['detections'], viz_file)
+
+                # Export ROI archive if requested
+                if args.export_roi:
+                    roi_zip = detection_output / (Path(result['path']).stem + '_rois.zip')
+                    create_roi_zip(result['detections'], roi_zip)
     else:
         # Parallel processing
         pool = None
@@ -2559,6 +2679,11 @@ def main():
                     if args.visualize:
                         viz_file = detection_output / (Path(result['path']).stem + '_overlay.png')
                         create_visualization(result['path'], result['detections'], viz_file)
+
+                    # Export ROI archive if requested
+                    if args.export_roi:
+                        roi_zip = detection_output / (Path(result['path']).stem + '_rois.zip')
+                        create_roi_zip(result['detections'], roi_zip)
         except Exception as e:
             logger.error(f"Error during parallel processing: {e}")
             raise

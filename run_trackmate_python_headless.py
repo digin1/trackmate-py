@@ -162,6 +162,7 @@ try:
         add_tile_and_row_columns,
         auto_detect_thresholds,
         compute_confidence_columns,
+        create_roi_zip,
         create_visualization,
     )
 except Exception as _import_err:  # pragma: no cover
@@ -922,6 +923,7 @@ def process_image(args):
 
     output_dir = params.get("output_dir")
     do_visualize = bool(params.get("visualize", False))
+    do_export_roi = bool(params.get("export_roi", False))
 
     try:
         df = detector.detect_spots_multiscale(image_path)
@@ -950,6 +952,12 @@ def process_image(args):
                     create_visualization(image_path, df, viz_file)
                 except Exception as viz_err:
                     logger.error(f"Visualization failed for {image_path}: {viz_err}")
+            if do_export_roi:
+                roi_zip = out_dir / (Path(image_path).stem + "_rois.zip")
+                try:
+                    create_roi_zip(df, roi_zip)
+                except Exception as roi_err:
+                    logger.error(f"ROI export failed for {image_path}: {roi_err}")
             result = {
                 "path": image_path,
                 "count": len(df),
@@ -1066,6 +1074,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--visualize", action="store_true",
                         help="Generate PNG visualization overlays")
+    parser.add_argument("--export-roi", action="store_true",
+                        help="Export detections as an ImageJ ROI archive "
+                             "(.zip) openable in Fiji ROI Manager.")
     return parser
 
 
@@ -1207,6 +1218,7 @@ def main() -> int:
     params_with_output = dict(params)
     params_with_output["output_dir"] = str(detection_output)
     params_with_output["visualize"] = bool(args.visualize)
+    params_with_output["export_roi"] = bool(args.export_roi)
     detection_args = [(img_path, params_with_output) for img_path in image_files]
     results: dict[str, int] = {}
 
