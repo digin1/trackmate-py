@@ -778,6 +778,15 @@ class PythonTrackMateDetector(TrackMateDetector):
                 ):
                     continue
 
+            # Maximum spot radius filter (measured FWHM, not detection scale).
+            # Drops cell-body / aggregate blobs that the multi-scale detector
+            # still fires on even with min_radius==max_radius pinned tight —
+            # the detection radius and the FWHM-fitted radius are independent
+            # quantities, so a tight detection window doesn't bound output
+            # spot size on its own. Vilhelmiina request 2026-05-05.
+            if self.max_spot_radius > 0 and measured_radius > self.max_spot_radius:
+                continue
+
             # Minimum spot radius filter (measured, not detection).
             if self.min_spot_radius > 0 and measured_radius < self.min_spot_radius:
                 continue
@@ -916,6 +925,7 @@ def process_image(args):
         valley_threshold=params.get("valley_threshold", 0.7),
         min_local_contrast=params.get("min_local_contrast", 0.0),
         min_spot_radius=params.get("min_spot_radius", 0.0),
+        max_spot_radius=params.get("max_spot_radius", 0.0),
         jvm_heap_max=params.get("jvm_heap_max", "8g"),  # accepted but unused
     )
     detector.subtract_background = params.get("subtract_background", 0)
@@ -1029,6 +1039,12 @@ def _build_parser() -> argparse.ArgumentParser:
                              "0 = disabled")
     parser.add_argument("--min-spot-radius", type=float, default=0.0,
                         help="Filter small spots (noise). 0 = disabled")
+    parser.add_argument("--max-spot-radius", type=float, default=0.0,
+                        help="Drop spots whose FWHM-fitted radius exceeds this many pixels. "
+                             "Use to filter cell-body / aggregate blobs that survive a tight "
+                             "--min-radius/--max-radius window (the FWHM ellipse measures the "
+                             "actual signal extent, independent of the detection scale). "
+                             "0 = disabled.")
     parser.add_argument("--min-peak-ratio", type=float, default=0.0,
                         help="Filter by peak/background ratio. 0 = disabled")
     parser.add_argument("--snr-threshold", type=float, default=1.35,
@@ -1166,6 +1182,7 @@ def main() -> int:
         "valley_threshold": args.valley_threshold,
         "min_local_contrast": args.min_local_contrast,
         "min_spot_radius": args.min_spot_radius,
+        "max_spot_radius": args.max_spot_radius,
         "min_peak_ratio": args.min_peak_ratio,
         "subtract_background": args.subtract_background,
         "detector_type": args.detector_type,

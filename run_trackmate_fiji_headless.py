@@ -210,6 +210,7 @@ class TrackMateDetector:
                  valley_threshold=0.7,
                  min_local_contrast=0.0,
                  min_spot_radius=0.0,
+                 max_spot_radius=0.0,
                  jvm_heap_max='8g'):
         """
         Initialize TrackMate detector with parameters from MATLAB script
@@ -257,6 +258,11 @@ class TrackMateDetector:
         self.valley_threshold = valley_threshold
         self.min_local_contrast = min_local_contrast
         self.min_spot_radius = min_spot_radius
+        # Upper bound on the FWHM-fitted spot radius — drops oversized
+        # detections (e.g. cell-body / aggregate blobs) that the multi-scale
+        # detector still fires on even when ``min_radius==max_radius`` is
+        # tight. 0.0 disables the filter (Vilhelmiina request 2026-05-05).
+        self.max_spot_radius = max_spot_radius
         self.jvm_heap_max = jvm_heap_max
 
         # Validate detector type
@@ -1370,6 +1376,9 @@ class TrackMateDetector:
 
                 # Filter out small spots (likely noise). Gate on the
                 # equivalent scalar radius sqrt(a*b).
+                if self.max_spot_radius > 0 and measured_radius > self.max_spot_radius:
+                    continue
+
                 if self.min_spot_radius > 0 and measured_radius < self.min_spot_radius:
                     continue  # Skip spots smaller than minimum
 
@@ -2380,6 +2389,7 @@ def process_image(args):
         valley_threshold=params.get('valley_threshold', 0.7),
         min_local_contrast=params.get('min_local_contrast', 0.0),
         min_spot_radius=params.get('min_spot_radius', 0.0),
+        max_spot_radius=params.get('max_spot_radius', 0.0),
         jvm_heap_max=params['jvm_heap_max']
     )
     detector.subtract_background = params.get('subtract_background', 0)
@@ -2466,6 +2476,11 @@ def main():
                             'Michelson contrast: C = (I_in - I_out) / (I_in + I_out), where I_in = mean intensity '
                             'inside spot, I_out = mean intensity in ring from radius to 2x radius. '
                             '0 = disabled (default), 0.18 = recommended for VGAT (typical range: 0.1-0.6).')
+    parser.add_argument('--max-spot-radius', type=float, default=0.0,
+                        help='Drop spots whose FWHM-fitted radius exceeds this many pixels (0=disabled). '
+                             'Use this to filter cell-body / aggregate blobs that survive a tight '
+                             '--min-radius/--max-radius window because the FWHM ellipse measures the '
+                             'actual signal extent rather than the detection scale.')
     parser.add_argument('--min-spot-radius', type=float, default=0.0,
                        help='Filter small spots (likely noise). Spots with measured radius < threshold are '
                             'discarded. 0 = disabled (default), 2.0 = recommended for removing noise.')
@@ -2608,6 +2623,7 @@ def main():
         'valley_threshold': args.valley_threshold,
         'min_local_contrast': args.min_local_contrast,
         'min_spot_radius': args.min_spot_radius,
+        'max_spot_radius': args.max_spot_radius,
         'min_peak_ratio': args.min_peak_ratio,
         'subtract_background': args.subtract_background,
         'detector_type': args.detector_type,
